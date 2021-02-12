@@ -21,16 +21,15 @@ sidebar <- dashboardSidebar(
     sidebarSearchForm(label = "Search...", "searchText", "searchButton"),
     sidebarMenu(
         menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),
-        menuItem("Widgets", tabName = "widgets", icon = icon("th"),  badgeLabel = "new",
-                 badgeColor = "green")
-    ),
-    menuItem("Stocks", icon = icon("bar-chart-o"),
-             menuSubItem("FTSE 100", tabName = "subitem1"),
-             menuSubItem("FTSE 250", tabName = "subitem2"),
-             menuSubItem("FTSE 350", tabName = "subitem3")
-    )
+        menuItem("Stocks", tabName = "stocks", icon = icon("bar-chart-o")),
+        menuItem("Help", tabName = "help", icon = icon("book-open"),  badgeLabel = "new",
+                 badgeColor = "green"))
+                 
+        )
+ 
     
-)
+
+    
 
 body <- dashboardBody(
     ## Body content
@@ -40,8 +39,7 @@ body <- dashboardBody(
                 fluidRow(
                     box(
                         title = "Enter Stock Code", width = 4, solidHeader = TRUE, status = "primary",
-                        textInput("StockCode", "StockCode", value = "FRES.L"),
-                        radioButtons("seasonal", "Select", c(NonSeasonal = "NonSeasonal", "Seasonal")),
+                        textInput("StockCode", "StockCode", value = "AAPL"),
                         actionButton(inputId = "click", label = "Predict")
                     )
                     
@@ -51,17 +49,17 @@ body <- dashboardBody(
                 fluidRow(
                     
                     box(
-                        title = "Auto Arima - Non Seasonal",
+                        title = "Auto Arima - Custom",
                         status = "primary",
                         plotOutput("auto.arima", height = 350),
-                        height = 400
+                        height = 425
                     ),
                     box(
                         title = "Auto Arima - Non Seasonal",
                         
                         width = 6,
                         tableOutput("auto.arima1"),
-                        height = 380
+                        height = 425
                     )
                     
                 ),
@@ -69,51 +67,44 @@ body <- dashboardBody(
                 fluidRow(
                     
                     box(
-                        title = "Auto Arima Seasonal",
+                        title = "Auto Arima - Industry standard",
                         status = "primary",
                         plotOutput("arima.seasonal", height = 350),
-                        height = 400
+                        height = 425
                     ),
                     box(
                         title = "Auto Arima Seasonal",
                         
                         width = 6,
                         tableOutput("arima.seasonal1"),
-                        height = 380
+                        height = 425
                     )
                     
                 )
         ),
         
-        # Second tab content
-        tabItem(tabName = "widgets",
-                h2("Widgets tab content")
-        ),
         
-        # third tab content
-        tabItem(tabName = "subitem1",
-                h2("FTSE 100"),
+        # second tab content
+        tabItem(tabName = "stocks",
+                h2("Yahoo Stocks"),
                 
                 fluidRow(
                     
                     box(
-                        title = "FTSE 100",
+                        title = "Yahoo Stocks",
                         status = "primary",
                         height = 800
                     )
                 )
         ),
         
-        # forth tab content
-        tabItem(tabName = "subitem2",
-                h2("FTSE 250")
-        ),
-        
-        # fifth tab content
-        tabItem(tabName = "subitem3",
-                h2("FTSE 350")
+        # third tab content
+        tabItem(tabName = "help",
+                h2("Help"),
                 
         )
+        
+        
     )
 )
 
@@ -136,77 +127,61 @@ server <- function(input, output) {
         hist(data, col = color, main = NULL)
     })
     
-    #Auto Arima Plot data
+    #custom Auto Arima Plot data
     output$auto.arima <- renderPlot({
-        
-        
-        # if (is.null(input$StockCode))
-        #   return()
         library('quantmod')
         library('ggplot2')
         library('forecast')
         library('tseries')
-        #Stock <- as.character(input$StockCode)
+        library('timeSeries')
+        library('xts')
         
         data <- eventReactive(input$click, {
-            (input$StockCode) 
+            (input$StockCode)  
         })
+
         Stock <- as.character(data())
         print(Stock)
-        #getSymbols("AAPL", src = "yahoo",from="2017-07-01")
-        # plot(AAPL$AAPL.Close)  
         Stock_df<-as.data.frame(getSymbols(Symbols = Stock, 
-                                           src = "yahoo", from = "2018-01-01", env = NULL))
-        Stock_df$Open = Stock_df[,1]
-        Stock_df$High = Stock_df[,2]
-        Stock_df$Low = Stock_df[,3]
-        Stock_df$Close = Stock_df[,4]
-        Stock_df$Volume = Stock_df[,5]
-        Stock_df$Adj = Stock_df[,6]
-        Stock_df <- Stock_df[,c(7,8,9,10,11,12)] 
+                                           from = "2017-01-01", 
+                                           auto.assign = FALSE))
         
+        Stock_data_Close = Stock_df[,4]
+        plot(Stock_data_Close)
+        Acf(Stock_data_Close, main='ACF for Differnced Series')
+        Pacf(Stock_data_Close, main='PACF for Differnced Series')
         
+        fitA = auto.arima(Stock_data_Close, seasonal = FALSE)
+        tsdisplay(residuals(fitA), lag.max=40, main='(1,1,3) Model Residuals')
+        auto.arima(Stock_data_Close, seasonal = FALSE)
         
-        #plot(as.ts(Stock_df$Close))
-        
-        Stock_df$v7_MA = ma(Stock_df$Close, order=7)
-        Stock_df$v30_MA <- ma(Stock_df$Close, order=30)
-        
-        #STL
-        rental_ma <- ts(na.omit(Stock_df$v7_MA), frequency=30)
-        decomp_rental <- stl(rental_ma, s.window="periodic")
-        #plot(decomp_rental)
-        adj_rental <- seasadj(decomp_rental)
-        #plot(adj_rental)
-        
-        
-        #arima
-        fit <- auto.arima(Stock_df$Close,ic="bic")
-        fit.forecast <- forecast(fit)
-        plot(fit.forecast,  main= Stock)
-        fit.forecast
+        #term = days
+        term <- 45
+        fcast1 <-  forecast(fitA, h=term)
+        plot(fcast1)
+    
         
     })
     
-    #Auto.Arima1 - plot here  Tile#5
+    
+    #Auto.Arima1 - Forecast table
     output$auto.arima1 <- renderTable({
-        #if (is.null(input$StockCode))
-        #  return()
         library('quantmod')
         library('ggplot2')
         library('forecast')
         library('tseries')
         
-        #Stock <- as.character(input$StockCode)
+        
         data <- eventReactive(input$click, {
             (input$StockCode)
         })
         Stock <- as.character(data())
         print(Stock)
-        #getSymbols("AAPL", src = "yahoo",from="2017-07-01")
-        # plot(AAPL$AAPL.Close)
+
         Stock_df<-as.data.frame(getSymbols(Symbols = Stock,
-                                           src = "yahoo", from = "2018-01-01", env = NULL))
+                                           src = "yahoo", 
+                                           from = "2018-01-01", 
+                                           auto.assign = FALSE))
         Stock_df$Open = Stock_df[,1]
         Stock_df$High = Stock_df[,2]
         Stock_df$Low = Stock_df[,3]
@@ -220,8 +195,8 @@ server <- function(input, output) {
         Stock_df$v7_MA = ma(Stock_df$Close, order=7)
         Stock_df$v30_MA <- ma(Stock_df$Close, order=30)
         
-        #STL
-        rental_ma <- ts(na.omit(Stock_df$v7_MA), frequency=30)
+        #Seasonal Trends
+        rental_ma <- ts(na.omit(Stock_df$v7_MA), frequency=12)
         decomp_rental <- stl(rental_ma, s.window="periodic")
         #plot(decomp_rental)
         adj_rental <- seasadj(decomp_rental)
@@ -235,77 +210,55 @@ server <- function(input, output) {
         (fit.forecast)
     })
     
-    #Auto.Arima Seasonal 
+    #Industry standard Auto.Arima 
     output$arima.seasonal <- renderPlot({
-        if (input$seasonal == "NonSeasonal")
-            return()
         library('quantmod')
         library('ggplot2')
         library('forecast')
         library('tseries')
+        library('timeSeries')
+        library(xts)
         
-        #Stock <- as.character(input$StockCode)
+        
         data <- eventReactive(input$click, {
             (input$StockCode)
         })
         Stock <- as.character(data())
         print(Stock)
-        #getSymbols("AAPL", src = "yahoo",from="2017-07-01")
-        # plot(AAPL$AAPL.Close)
+
         Stock_df<-as.data.frame(getSymbols(Symbols = Stock,
-                                           src = "yahoo", from = "2018-01-01", env = NULL))
-        Stock_df$Open = Stock_df[,1]
-        Stock_df$High = Stock_df[,2]
-        Stock_df$Low = Stock_df[,3]
-        Stock_df$Close = Stock_df[,4]
-        Stock_df$Volume = Stock_df[,5]
-        Stock_df$Adj = Stock_df[,6]
-        Stock_df <- Stock_df[,c(7,8,9,10,11,12)]
-        
-        #plot(as.ts(Stock_df$Close))
-        
-        Stock_df$v7_MA = ma(Stock_df$Close, order=7)
-        Stock_df$v30_MA <- ma(Stock_df$Close, order=30)
-        
-        #STL
-        rental_ma <- ts(na.omit(Stock_df$v7_MA), frequency=30)
-        decomp_rental <- stl(rental_ma, s.window="periodic")
-        #plot(decomp_rental)
-        adj_rental <- seasadj(decomp_rental)
-        #plot(adj_rental)
+                                           from = "2017-01-01", 
+                                           auto.assign = FALSE))
+
+        Stock_data_Close = Stock_df[,4]
+        plot(Stock_data_Close)
+
+        fitB = arima(Stock_data_Close, order = c(1,1,1))
+        tsdisplay(residuals(fitB), lag.max=40, main='(1,1,1) Model Residuals')
         
         
-        #arima
-        #fit <- auto.arima(Stock_df$Close,ic="bic")
-        #fit.forecast <- forecast(fit)
-        #plot(fit.forecast,   col = "red")
-        #(fit.forecast)
-        fit_s<-auto.arima(adj_rental, seasonal=TRUE)
-        fcast_s <- forecast(fit_s, h=10)
-        plot(fcast_s)
+        term <- 10
+        fcast2 <- forecast(fitB, h=term)
+        plot(fcast2)
+       
     })
     
-    #Auto.Arima Seasonal 
+    #Auto.Arima Seasonal Forecast table
     output$arima.seasonal1 <- renderTable({
-        #if (is.null(input$StockCode))
-        #  return()
-        if (input$seasonal == "NonSeasonal")
-            return()
         library('quantmod')
         library('ggplot2')
         library('forecast')
         library('tseries')
         
-        #Stock <- as.character(input$StockCode)
         data <- eventReactive(input$click, {
             (input$StockCode)
         })
         Stock <- as.character(data())
         print(Stock)
-        #getSymbols("AAPL", src = "yahoo",from="2017-07-01")
-        # plot(AAPL$AAPL.Close)
         Stock_df<-as.data.frame(getSymbols(Symbols = Stock,
-                                           src = "yahoo", from = "2018-01-01", env = NULL))
+                                           src = "yahoo", 
+                                           from = "2010-01-01", 
+                                           auto.assign = FALSE))
         Stock_df$Open = Stock_df[,1]
         Stock_df$High = Stock_df[,2]
         Stock_df$Low = Stock_df[,3]
@@ -320,7 +273,7 @@ server <- function(input, output) {
         Stock_df$v30_MA <- ma(Stock_df$Close, order=30)
         
         #STL
-        rental_ma <- ts(na.omit(Stock_df$v7_MA), frequency=30)
+        rental_ma <- ts(na.omit(Stock_df$v7_MA), frequency=12)
         decomp_rental <- stl(rental_ma, s.window="periodic")
         #plot(decomp_rental)
         adj_rental <- seasadj(decomp_rental)
@@ -333,9 +286,11 @@ server <- function(input, output) {
         #plot(fit.forecast,   col = "red")
         #(fit.forecast)
         fit_s<-auto.arima(adj_rental, seasonal=TRUE)
-        fcast_s <- forecast(fit_s, h=10)
+        term <- 10
+        fcast_s <- forecast(fit_s, h=term)
         fcast_s
     })
+    
     
     
     output$scatter1 <- renderPlot({

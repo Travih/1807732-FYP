@@ -127,7 +127,7 @@ server <- function(input, output) {
         hist(data, col = color, main = NULL)
     })
     
-    #custom Auto Arima Plot data
+    #Auto Arima Plot data
     output$auto.arima <- renderPlot({
         library('quantmod')
         library('ggplot2')
@@ -147,18 +147,21 @@ server <- function(input, output) {
                                            auto.assign = FALSE))
         
         Stock_data_Close = Stock_df[,4]
-        plot(Stock_data_Close)
+        #plot(Stock_data_Close)
         Acf(Stock_data_Close, main='ACF for Differnced Series')
         Pacf(Stock_data_Close, main='PACF for Differnced Series')
         
         fitA = auto.arima(Stock_data_Close, seasonal = FALSE)
-        tsdisplay(residuals(fitA), lag.max=40, main='(1,1,3) Model Residuals')
+        #fitA = arima(Stock_data_Close, order = c(1,1,3))
+        tsdisplay(residuals(fitA), lag.max=40, main='(0,1,1) Model Residuals')
         auto.arima(Stock_data_Close, seasonal = FALSE)
         
         #term = days
         term <- 45
         fcast1 <-  forecast(fitA, h=term)
-        plot(fcast1)
+        #fcast2 <-  forecast(Stock_data_Close, h=term)
+        plot(fcast1, col="blue", lty=1, ylab = "Price", xlab = "Days")
+        #lines(Stock_data_Close, col="red", lty=2)
     
         
     })
@@ -180,7 +183,7 @@ server <- function(input, output) {
 
         Stock_df<-as.data.frame(getSymbols(Symbols = Stock,
                                            src = "yahoo", 
-                                           from = "2018-01-01", 
+                                           from = "2017-01-01", 
                                            auto.assign = FALSE))
         Stock_df$Open = Stock_df[,1]
         Stock_df$High = Stock_df[,2]
@@ -231,7 +234,7 @@ server <- function(input, output) {
                                            auto.assign = FALSE))
 
         Stock_data_Close = Stock_df[,4]
-        plot(Stock_data_Close)
+        #plot(Stock_data_Close)
 
         fitB = arima(Stock_data_Close, order = c(1,1,1))
         tsdisplay(residuals(fitB), lag.max=40, main='(1,1,1) Model Residuals')
@@ -239,7 +242,8 @@ server <- function(input, output) {
         
         term <- 10
         fcast2 <- forecast(fitB, h=term)
-        plot(fcast2)
+        plot(fcast2, col="blue", lty=1, ylab = "Price", xlab = "Days")
+        
        
     })
     
@@ -257,7 +261,7 @@ server <- function(input, output) {
         print(Stock)
         Stock_df<-as.data.frame(getSymbols(Symbols = Stock,
                                            src = "yahoo", 
-                                           from = "2010-01-01", 
+                                           from = "2017-01-01", 
                                            auto.assign = FALSE))
         Stock_df$Open = Stock_df[,1]
         Stock_df$High = Stock_df[,2]

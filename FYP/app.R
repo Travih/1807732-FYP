@@ -55,7 +55,7 @@ body <- dashboardBody(
                         height = 425
                     ),
                     box(
-                        title = "Auto Arima - Non Seasonal",
+                        title = "Auto Arima - Custom",
                         
                         width = 6,
                         tableOutput("auto.arima1"),
@@ -69,17 +69,27 @@ body <- dashboardBody(
                     box(
                         title = "Auto Arima - Industry standard",
                         status = "primary",
-                        plotOutput("arima.seasonal", height = 350),
+                        plotOutput("arima.industry", height = 350),
                         height = 425
                     ),
                     box(
-                        title = "Auto Arima Seasonal",
+                        title = "Auto Arima - Industry standard",
                         
                         width = 6,
-                        tableOutput("arima.seasonal1"),
+                        tableOutput("arima.industry1"),
                         height = 425
                     )
                     
+                ),
+                
+                fluidRow(
+                    
+                    box(
+                        title = "Moving Average",
+                        status = "primary",
+                        plotOutput("mov.avg", height = 350),
+                        height = 425
+                    )
                 )
         ),
         
@@ -115,11 +125,7 @@ ui <- dashboardPage(header, sidebar, body, skin = skin)
 server <- function(input, output) { 
     set.seed(122)
     histdata <- rnorm(500)
-    
     output$plot1 <- renderPlot({
-        if (is.null(input$count) || is.null(input$fill))
-            return()
-        
         data <- histdata[seq(1, input$count)]
         color <- input$fill
         if (color == "none")
@@ -214,13 +220,13 @@ server <- function(input, output) {
     })
     
     #Industry standard Auto.Arima 
-    output$arima.seasonal <- renderPlot({
+    output$arima.industry <- renderPlot({
         library('quantmod')
         library('ggplot2')
         library('forecast')
         library('tseries')
         library('timeSeries')
-        library(xts)
+        library('xts')
         
         
         data <- eventReactive(input$click, {
@@ -247,8 +253,8 @@ server <- function(input, output) {
        
     })
     
-    #Auto.Arima Seasonal Forecast table
-    output$arima.seasonal1 <- renderTable({
+    #Auto.Arima Industry standard Forecast table
+    output$arima.industry1 <- renderTable({
         library('quantmod')
         library('ggplot2')
         library('forecast')
@@ -295,7 +301,43 @@ server <- function(input, output) {
         fcast_s
     })
     
-    
+    output$mov.avg <- renderPlot({
+        library('ggplot2')
+        library('quantmod')
+        library('TTR')
+        
+        data <- eventReactive(input$click, {
+            (input$StockCode)
+        })
+        Stock <- as.character(data())
+        print(Stock)
+        
+        Stock_df<-as.data.frame(getSymbols(Symbols = Stock,
+                                           from = "2017-01-01",
+                                           warnings = FALSE,
+                                           auto.assign = FALSE))
+        
+        
+        names(Stock_df) <- c('Open', 'High', 'Low', 'Close', 'Volume', 'Adjusted')
+        Stock_df$Date <- as.Date(rownames(Stock_df))
+        
+        #Stock_data_Close = Stock_df[,4]
+        
+        Stock_df$MA5 <- TTR::SMA(Stock_df$Close, n = 5)
+        Stock_df$MA10 <- TTR::SMA(Stock_df$Close, n = 10)
+        
+        plt <-  ggplot(Stock_df, aes(x = Date))
+        plt <- plt + geom_line(aes(y = Close, color = "Close"), group = 1)
+        plt <- plt + geom_line(aes(y = MA5, color = "MA5"), group = 1)
+        plt <- plt + geom_line(aes(y = MA10, color = "MA10"), group = 1)
+        plt <- plt + theme_minimal()
+        
+        plt <- plt + theme(legend.position = "top")
+        plt <- plt + labs(title = "Moving averages")
+        plt <- plt + labs(color = "Prices")
+        plt
+        
+    })
     
     output$scatter1 <- renderPlot({
         spread <- as.numeric(input$spread) / 100
